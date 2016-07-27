@@ -4,6 +4,9 @@ var fs       = require('fs');
 var optimist = require('optimist');
 var path     = require('path');
 var html2js  = require('../src/html2js');
+var glob     = require('glob');
+var mkdirp    = require('mkdirp');
+var output   = '';
 
 //
 // Setup usage and parse arguments
@@ -36,7 +39,7 @@ if (argv._.length === 0 || argv.help) {
   process.exit();
 }
 
-var inputFile = argv._[0];
+var inputFiles = glob.sync(argv._[0]);
 var outputFile = argv._[1];
 var moduleName = argv.m;
 var moduleVar = argv['module-var'];
@@ -51,22 +54,29 @@ var wordsMatchLeftJustified = function(word1, word2) {
   return word1.slice(0, word2.length) === word2;
 };
 
-var content = fs.readFileSync(inputFile, 'utf8');
-var inputAlias = inputFile;
-if(baseDir){
-  baseDir = path.resolve(baseDir);
-  inputAlias = inputAlias.replace(baseDir, '');
-}
-if (prefixToStrip) {
-  if(wordsMatchLeftJustified(inputAlias, prefixToStrip) && (prefixToStrip !== inputAlias)) {
-    inputAlias = inputAlias.replace(prefixToStrip, '');
+inputFiles.forEach(function (inputFile) {
+  var content = fs.readFileSync(inputFile, 'utf8');
+  var inputAlias = inputFile;
+  if(baseDir){
+    baseDir = path.resolve(baseDir);
+    inputAlias = inputAlias.replace(baseDir, '');
   }
-}
-inputAlias = inputAlias.replace(/\\/g, '/');
-var output = html2js(inputAlias, content, moduleName, moduleVar);
+  if (prefixToStrip) {
+    if(wordsMatchLeftJustified(inputAlias, prefixToStrip) && (prefixToStrip !== inputAlias)) {
+      inputAlias = inputAlias.replace(prefixToStrip, '');
+    }
+  }
+  inputAlias = inputAlias.replace(/\\/g, '/');
+  output += html2js(inputAlias, content, moduleName, moduleVar);
+});
 
 if (outputFile) {
-  fs.writeFileSync(outputFile, output, 'utf8');
+  fs.stat(path.resolve(outputFile), function (err) {
+    if (err) {
+      mkdirp.sync(path.dirname(outputFile));
+    }
+    fs.writeFileSync(outputFile, output, 'utf8');
+  });
 } else {
   console.log(output);
 }
